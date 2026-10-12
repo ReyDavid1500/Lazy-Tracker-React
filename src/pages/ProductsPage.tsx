@@ -14,7 +14,7 @@ import type { Product } from '../types'
 
 function StockBar({ value, max }: { value: number; max: number }) {
   const pct = max === 0 ? 0 : Math.min(100, (value / max) * 100)
-  const color = value <= 0 ? 'bg-danger' : value < max ? 'bg-warning' : 'bg-success'
+  const color = value <= 0 ? 'bg-danger' : value < max * 0.5 ? 'bg-warning' : 'bg-success'
   return (
     <div className="h-1.5 bg-surface-high rounded-full overflow-hidden w-full">
       <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
@@ -31,6 +31,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('')
   const [stockModal, setStockModal] = useState<Product | null>(null)
   const [thresholdModal, setThresholdModal] = useState<Product | null>(null)
+  const [deleteModal, setDeleteModal] = useState<Product | null>(null)
   const [stockQty, setStockQty] = useState(0)
   const [newThreshold, setNewThreshold] = useState(0)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -65,6 +66,7 @@ export default function ProductsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] })
       toast('Product removed', 'success')
+      setDeleteModal(null)
     },
     onError: (e: any) => toast(e.response?.data?.message ?? 'Failed', 'error'),
   })
@@ -84,14 +86,8 @@ export default function ProductsPage() {
   const openStock = (p: Product) => { setStockModal(p); setStockQty(1) }
   const openThreshold = (p: Product) => { setThresholdModal(p); setNewThreshold(p.lowStockThreshold) }
 
-  const confirmDelete = (p: Product) => {
-    if (window.confirm(`Remove "${p.name}" from inventory?`)) {
-      deleteMut.mutate(p.id)
-    }
-  }
-
   return (
-    <div className="flex flex-col h-full bg-bg">
+    <div className="min-h-full bg-bg flex flex-col">
       {/* Header */}
       <div className="px-4 pt-12 pb-4">
         <div className="flex items-center justify-between mb-4">
@@ -136,7 +132,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Product list */}
-      <div className="flex-1 overflow-y-auto px-4 pb-6 flex flex-col gap-2">
+      <div className="flex-1 px-4 pb-24 flex flex-col gap-2">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
@@ -152,6 +148,9 @@ export default function ProductsPage() {
           filtered.map(p => {
             const isLow = p.currentStock <= p.lowStockThreshold
             const isOpen = expanded === p.id
+            const barMax = p.lowStockThreshold > 0
+              ? Math.max(p.lowStockThreshold * 2, p.currentStock)
+              : Math.max(p.currentStock, 1)
             return (
               <div key={p.id} className={`bg-surface border rounded-2xl overflow-hidden transition-colors ${isLow ? 'border-warning/40' : 'border-border'}`}>
                 <button
@@ -165,7 +164,7 @@ export default function ProductsPage() {
                     </div>
                     {p.brand && <p className="text-text-muted text-xs">{p.brand}</p>}
                     <div className="mt-2">
-                      <StockBar value={p.currentStock} max={Math.max(p.lowStockThreshold * 2, p.currentStock)} />
+                      <StockBar value={p.currentStock} max={barMax} />
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
@@ -174,7 +173,10 @@ export default function ProductsPage() {
                     </p>
                     <p className="text-text-muted text-xs">in stock</p>
                   </div>
-                  {isOpen ? <ChevronUp size={16} className="text-text-muted shrink-0" /> : <ChevronDown size={16} className="text-text-muted shrink-0" />}
+                  {isOpen
+                    ? <ChevronUp size={16} className="text-text-muted shrink-0" />
+                    : <ChevronDown size={16} className="text-text-muted shrink-0" />
+                  }
                 </button>
 
                 {isOpen && (
@@ -201,7 +203,7 @@ export default function ProductsPage() {
                           Threshold
                         </button>
                         <button
-                          onClick={() => confirmDelete(p)}
+                          onClick={() => setDeleteModal(p)}
                           className="flex items-center justify-center gap-1.5 border border-danger/30 text-danger text-sm py-2 rounded-xl hover:bg-danger-bg transition-colors"
                         >
                           <Trash2 size={14} />
@@ -255,7 +257,7 @@ export default function ProductsPage() {
         {thresholdModal && (
           <div className="flex flex-col gap-4">
             <p className="text-text-sub text-sm">
-              Alert when stock drops below this number
+              Alert when <span className="text-text-primary font-medium">{thresholdModal.name}</span> drops below this number
             </p>
             <input
               type="number"
@@ -271,6 +273,32 @@ export default function ProductsPage() {
             >
               {thresholdMut.isPending ? 'Saving…' : 'Save'}
             </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete confirmation modal */}
+      <Modal open={!!deleteModal} onClose={() => setDeleteModal(null)} title="Remove Product">
+        {deleteModal && (
+          <div className="flex flex-col gap-4">
+            <p className="text-text-sub text-sm">
+              Remove <span className="text-text-primary font-medium">"{deleteModal.name}"</span> from inventory? This action cannot be undone.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="border border-border text-text-sub font-medium py-3 rounded-xl text-sm hover:border-border-focus hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteMut.mutate(deleteModal.id)}
+                disabled={deleteMut.isPending}
+                className="bg-danger/10 border border-danger/30 text-danger font-semibold py-3 rounded-xl text-sm hover:bg-danger-bg disabled:opacity-50 transition-colors"
+              >
+                {deleteMut.isPending ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
           </div>
         )}
       </Modal>

@@ -52,8 +52,7 @@ export default function ConfirmPage() {
         name: identification.name,
         brand: identification.brand ?? undefined,
         sku: identification.sku ?? undefined,
-        currentStock: qty,
-        lowStockThreshold: 5,
+        initialStock: qty
       })
       toast(`Added "${data.name}" with stock ${qty}`, 'success')
       navigate('/products', { replace: true })
