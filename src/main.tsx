@@ -4,16 +4,16 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 
-import { AuthProvider } from './store/auth'
-import { ToastProvider } from './store/toast'
-import { ProtectedRoute } from './components/ProtectedRoute'
-import { Layout } from './components/Layout'
+import { AuthProvider } from '@/store/auth'
+import { ToastProvider } from '@/store/toast'
+import { ProtectedRoute } from '@/components/protected-route'
+import { Layout } from '@/components/layout'
 
-import LoginPage from './pages/LoginPage'
-import ScanPage from './pages/ScanPage'
-import ProductsPage from './pages/ProductsPage'
-import ProfilePage from './pages/ProfilePage'
-import ConfirmPage from './pages/ConfirmPage'
+import { LoginPage } from '@/pages/login-page'
+import { ScanPage } from '@/pages/scan-page'
+import { ProductsPage } from '@/pages/products-page'
+import { ProfilePage } from '@/pages/profile-page'
+import { ConfirmPage } from '@/pages/confirm-page'
 
 const queryClient = new QueryClient({
   defaultOptions: {

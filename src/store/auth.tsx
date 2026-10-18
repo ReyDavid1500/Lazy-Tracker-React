@@ -1,19 +1,20 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import type { User } from '../types'
+import type { User } from '@/types'
 
-interface AuthCtx {
-  user: User | null
-  token: string | null
+type AuthContext = {
+  readonly user: User | null
+  readonly token: string | null
+  readonly loading: boolean
   signIn: (token: string, user: User) => void
   signOut: () => void
-  loading: boolean
 }
 
-const Ctx = createContext<AuthCtx>(null!)
+const AuthCtx = createContext<AuthContext>(null!)
 
 const USER_KEY = 'lt_user'
+const TOKEN_KEY = 'jwt'
 
-function loadUser(): User | null {
+function loadStoredUser(): User | null {
   try {
     const raw = localStorage.getItem(USER_KEY)
     return raw ? (JSON.parse(raw) as User) : null
@@ -22,35 +23,38 @@ function loadUser(): User | null {
   }
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('jwt'))
-  const [user, setUser] = useState<User | null>(() => loadUser())
+type AuthProviderProps = {
+  readonly children: ReactNode
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY))
+  const [user, setUser] = useState<User | null>(() => loadStoredUser())
   const [loading] = useState(false)
 
-  // If token is gone (e.g. cleared by 401 interceptor) wipe user too
   useEffect(() => {
     if (!token) setUser(null)
   }, [token])
 
-  const signIn = (t: string, u: User) => {
-    localStorage.setItem('jwt', t)
+  const signIn = (t: string, u: User): void => {
+    localStorage.setItem(TOKEN_KEY, t)
     localStorage.setItem(USER_KEY, JSON.stringify(u))
     setToken(t)
     setUser(u)
   }
 
-  const signOut = () => {
-    localStorage.removeItem('jwt')
+  const signOut = (): void => {
+    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
     setToken(null)
     setUser(null)
   }
 
   return (
-    <Ctx.Provider value={{ user, token, signIn, signOut, loading }}>
+    <AuthCtx.Provider value={{ user, token, signIn, signOut, loading }}>
       {children}
-    </Ctx.Provider>
+    </AuthCtx.Provider>
   )
 }
 
-export const useAuth = () => useContext(Ctx)
+export const useAuth = (): AuthContext => useContext(AuthCtx)

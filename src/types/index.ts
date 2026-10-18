@@ -8,7 +8,7 @@ export type User = {
 }
 
 export type Product = {
-  id: string
+  productId: string
   name: string
   brand: string | null
   sku: string | null
@@ -19,7 +19,7 @@ export type Product = {
 }
 
 export type MatchedProduct = {
-  id: string
+  productId: string
   name: string
   brand: string | null
   sku: string | null
