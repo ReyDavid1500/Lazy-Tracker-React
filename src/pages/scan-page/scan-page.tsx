@@ -13,7 +13,7 @@ const styles = {
   header: 'px-4 pt-12 pb-4 flex items-center justify-between md:pt-8',
   headerIcon: 'w-10 h-10 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center',
   queueBanner: 'mx-4 mb-3 flex items-center gap-3 bg-warning-bg border border-warning/30 rounded-xl px-4 py-3',
-  viewfinder: 'mx-4 relative rounded-2xl overflow-hidden bg-surface border border-border',
+  viewfinder: 'mx-4 relative rounded-2xl overflow-hidden bg-surface border border-border max-h-50',
   actions: 'px-4 py-5 flex flex-col gap-3 md:flex-row md:flex-wrap',
 } as const
 
@@ -176,7 +176,7 @@ export function ScanPage() {
         </div>
       )}
 
-      <div className={styles.viewfinder} style={{ height: "min(50dvh, 480px)", minHeight: "200px" }}>
+      <div className={styles.viewfinder}>
         <video
           ref={videoRef}
           playsInline
