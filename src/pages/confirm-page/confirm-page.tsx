@@ -20,9 +20,9 @@ const styles = {
   statGrid: 'grid grid-cols-2 gap-3',
   statCell: 'bg-surface-high rounded-xl p-3',
   label: 'text-xs font-semibold text-text-sub uppercase tracking-wider block mb-3',
-  qtyRow: 'flex items-center gap-4 bg-surface border border-border rounded-2xl p-2',
-  qtyBtn: 'w-12 h-12 rounded-xl bg-surface-high flex items-center justify-center text-text-primary hover:bg-border transition-colors text-xl font-bold',
-  qtyInput: 'flex-1 bg-transparent text-center text-4xl font-bold text-text-primary outline-none',
+  qtyRow: 'flex bg-surface border border-border rounded-2xl p-2',
+  qtyBtn: 'w-24 h-16 rounded-xl bg-surface-high text-text-primary hover:bg-border transition-colors text-4xl font-bold',
+  qtyInput: 'bg-transparent text-center text-4xl font-bold text-text-primary outline-none w-full',
 } as const
 
 type LocationState = { scanResult: ScanResponse } | null
@@ -166,6 +166,7 @@ export function ConfirmPage() {
                   className={styles.qtyInput}
                   min={0}
                   aria-label="Stock count"
+                  disabled
                 />
                 <button
                   type="button"
@@ -256,6 +257,7 @@ export function ConfirmPage() {
                   className={styles.qtyInput}
                   min={0}
                   aria-label="Initial stock count"
+                  disabled
                 />
                 <button
                   type="button"
