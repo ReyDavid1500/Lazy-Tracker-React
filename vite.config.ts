@@ -24,8 +24,8 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       manifest: {
-        name: 'LazyTracker',
-        short_name: 'LazyTracker',
+        name: 'lazyTracker',
+        short_name: 'lazyTracker',
         description: 'Inventory management for small businesses',
         theme_color: '#0A0F1E',
         background_color: '#0A0F1E',
