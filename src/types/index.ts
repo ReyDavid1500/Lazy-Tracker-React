@@ -11,7 +11,6 @@ export type Product = {
   productId: string
   name: string
   brand: string | null
-  sku: string | null
   currentStock: number
   lowStockThreshold: number
   imageUrl?: string | null
@@ -19,13 +18,12 @@ export type Product = {
 }
 
 export type MatchedProduct = {
-  productId: string
+  id: string
   name: string
   brand: string | null
-  sku: string | null
   currentStock: number
   lowStockThreshold: number
-  matchType: 'sku' | 'exact' | 'fuzzy'
+  matchType: 'exact' | 'fuzzy'
   matchScore: number
 }
 
@@ -33,7 +31,6 @@ export type MatchedProduct = {
 export type ScanIdentification = {
   name: string
   brand: string | null
-  sku: string | null
   description: string | null
   rawNote: string
 }
@@ -59,11 +56,4 @@ export type TeamMember = {
 export type Business = {
   id: string
   name: string
-}
-
-export type QueueEntry = {
-  id?: number
-  imageBase64: string
-  mimeType: string
-  timestamp: number
 }

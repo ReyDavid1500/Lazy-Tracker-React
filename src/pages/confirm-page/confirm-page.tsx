@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Sparkles, AlertTriangle, CheckCircle, RefreshCcw,
-  Package, Tag, Hash,
+  Package, Tag,
 } from 'lucide-react'
 import { confirmScan } from '@/api/scan'
 import { createProduct } from '@/api/products'
@@ -23,8 +23,6 @@ const styles = {
   qtyRow: 'flex items-center gap-4 bg-surface border border-border rounded-2xl p-2',
   qtyBtn: 'w-12 h-12 rounded-xl bg-surface-high flex items-center justify-center text-text-primary hover:bg-border transition-colors text-xl font-bold',
   qtyInput: 'flex-1 bg-transparent text-center text-4xl font-bold text-text-primary outline-none',
-  primaryBtn: 'w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-light disabled:opacity-50 text-white font-semibold py-4 rounded-2xl text-sm shadow-[0_0_20px_rgba(79,106,255,0.3)] transition-colors',
-  secondaryBtn: 'w-full flex items-center justify-center gap-2 border border-border text-text-sub py-3 rounded-2xl text-sm hover:border-border-focus hover:text-text-primary transition-colors',
 } as const
 
 type LocationState = { scanResult: ScanResponse } | null
@@ -57,7 +55,7 @@ export function ConfirmPage() {
     if (!product) return
     setSubmitting(true)
     try {
-      await confirmScan(product.productId, newStock)
+      await confirmScan(product.id, newStock)
       toast(`Stock set to ${newStock} for ${product.name}`, 'success')
       navigate('/scan', { replace: true })
     } catch (err: unknown) {
@@ -75,7 +73,6 @@ export function ConfirmPage() {
       const { data } = await createProduct({
         name: identification.name,
         brand: identification.brand ?? undefined,
-        sku: identification.sku ?? undefined,
         initialStock: newStock,
       })
       toast(`Added "${data.name}" with stock ${newStock}`, 'success')
@@ -119,30 +116,22 @@ export function ConfirmPage() {
               <div className="flex items-start justify-between gap-3 mb-4">
                 <h2 className="text-text-primary font-semibold text-base leading-snug">{product!.name}</h2>
                 <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${
-                  product!.matchType === 'sku'
-                    ? 'bg-success/20 text-success'
-                    : isFuzzy
+                  isFuzzy
                     ? 'bg-warning/20 text-warning'
                     : 'bg-accent-bg text-accent'
                 }`}>
-                  {product!.matchType === 'sku' ? 'SKU match' : isFuzzy ? 'Fuzzy' : 'Exact'}
+                  {isFuzzy ? 'Fuzzy' : 'Exact'}
                 </span>
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-4">
-                {product!.brand && (
+              {product!.brand && (
+                <div className="flex flex-wrap gap-2 mb-4">
                   <span className="flex items-center gap-1.5 text-xs text-text-sub bg-surface-high px-3 py-1.5 rounded-lg">
                     <Tag size={12} aria-hidden="true" />
                     {product!.brand}
                   </span>
-                )}
-                {product!.sku && (
-                  <span className="flex items-center gap-1.5 text-xs text-text-sub bg-surface-high px-3 py-1.5 rounded-lg">
-                    <Hash size={12} aria-hidden="true" />
-                    {product!.sku}
-                  </span>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className={styles.statGrid}>
                 <div className={styles.statCell}>
@@ -234,13 +223,6 @@ export function ConfirmPage() {
                   <div className="bg-surface-high rounded-xl p-3">
                     <p className="text-text-muted text-xs mb-1">Brand</p>
                     <p className="text-text-sub text-sm">{scanResult.identification.brand}</p>
-                  </div>
-                )}
-
-                {scanResult.identification.sku && (
-                  <div className="bg-surface-high rounded-xl p-3">
-                    <p className="text-text-muted text-xs mb-1">SKU / Barcode</p>
-                    <p className="text-accent text-sm font-mono">{scanResult.identification.sku}</p>
                   </div>
                 )}
 

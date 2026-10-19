@@ -14,5 +14,5 @@ export const updateStock = (productId: string, quantity: number) =>
   api.post(`/stock/${productId}`, { quantity })
 
 export const createProduct = (data: {
-  name: string; brand?: string; sku?: string; initialStock: number;
+  name: string; brand?: string; initialStock: number;
 }) => api.post<Product>('/products', data)

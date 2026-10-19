@@ -106,9 +106,6 @@ function ProductCard({
 
       {expanded && (
         <div id={`product-${p.productId}-details`} className={styles.expandedBody}>
-          {p.sku && (
-            <p className="text-text-muted text-xs mb-3">SKU: <span className="font-mono text-text-sub">{p.sku}</span></p>
-          )}
           <div className={styles.actionRow}>
             <button
               type="button"
@@ -163,7 +160,7 @@ export function ProductsPage() {
 
   const [stockInput, setStockInput] = useState('')
   const [thresholdInput, setThresholdInput] = useState('')
-  const [newProduct, setNewProduct] = useState({ name: '', brand: '', sku: '', initialStock: '0' })
+  const [newProduct, setNewProduct] = useState({ name: '', brand: '', initialStock: '0' })
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
@@ -217,14 +214,13 @@ export function ProductsPage() {
     mutationFn: () => createProduct({
       name: newProduct.name.trim(),
       brand: newProduct.brand.trim() || undefined,
-      sku: newProduct.sku.trim() || undefined,
       initialStock: parseInt(newProduct.initialStock, 10) || 0,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] })
       toast('Product added', 'success')
       setAddModal(false)
-      setNewProduct({ name: '', brand: '', sku: '', initialStock: '0' })
+      setNewProduct({ name: '', brand: '', initialStock: '0' })
     },
     onError: (e: unknown) => {
       const axiosErr = e as { response?: { data?: { message?: string } } }
@@ -238,8 +234,7 @@ export function ProductsPage() {
   const filtered = products
     .filter(p =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.brand?.toLowerCase().includes(search.toLowerCase()) ||
-      p.sku?.toLowerCase().includes(search.toLowerCase()),
+      p.brand?.toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
       const aLow = isLowStock(a) ? 0 : 1
@@ -446,7 +441,7 @@ export function ProductsPage() {
       {/* Add product modal */}
       <Modal
         open={addModal}
-        onClose={() => { setAddModal(false); setNewProduct({ name: '', brand: '', sku: '', initialStock: '0' }) }}
+        onClose={() => { setAddModal(false); setNewProduct({ name: '', brand: '', initialStock: '0' }) }}
         title="Add Product"
       >
         <div className="flex flex-col gap-4">
@@ -470,17 +465,6 @@ export function ProductsPage() {
                 type="text"
                 value={newProduct.brand}
                 onChange={e => setNewProduct(p => ({ ...p, brand: e.target.value }))}
-                placeholder="Optional"
-                className={styles.input}
-              />
-            </div>
-            <div>
-              <label htmlFor="new-sku" className={styles.label}>SKU</label>
-              <input
-                id="new-sku"
-                type="text"
-                value={newProduct.sku}
-                onChange={e => setNewProduct(p => ({ ...p, sku: e.target.value }))}
                 placeholder="Optional"
                 className={styles.input}
               />

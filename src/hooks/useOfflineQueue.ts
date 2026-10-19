@@ -1,6 +1,12 @@
 import { openDB } from 'idb'
 import { scanImage } from '../api/scan'
-import type { QueueEntry } from '../types'
+type QueueEntry = {
+  id?: number
+  imageBase64: string
+  mimeType: string
+  timestamp: number
+}
+
 
 const dbPromise = openDB('lazytracker-queue', 1, {
   upgrade(db) {
