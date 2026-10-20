@@ -233,7 +233,7 @@ function ProductCard({
                 )}
               >
                 <Clock size={13} aria-hidden="true" />
-                Update interval
+                Set update interval
               </button>
             )}
 
