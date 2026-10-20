@@ -1,24 +1,38 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0A0F1E;
-  --color-surface: #141B2D;
-  --color-surface-high: #1C2540;
-  --color-border: #2A3352;
-  --color-border-focus: #4F6AFF;
-  --color-accent: #4F6AFF;
-  --color-accent-light: #7B96FF;
-  --color-accent-bg: #1A2248;
-  --color-success: #22C55E;
-  --color-success-bg: #0D2B1A;
-  --color-warning: #F59E0B;
-  --color-warning-bg: #2B1A07;
-  --color-danger: #EF4444;
-  --color-danger-bg: #2B0A0A;
+  /* ── Mid-tone slate theme ───────────────────────────────────────────────
+     Backgrounds sit around HSL 220 20–30% — warm enough to feel alive,
+     dark enough to feel calm. Not light-mode, not deep-dark. Just right.
+  ── */
+
+  /* Backgrounds */
+  --color-bg:           #1E2330;   /* page canvas  — HSL 225 24% 15% */
+  --color-surface:      #262D3F;   /* card surface — HSL 225 23% 20% */
+  --color-surface-high: #2F3850;   /* elevated     — HSL 225 24% 25% */
+
+  /* Borders */
+  --color-border:       #3A4460;   /* subtle       — HSL 225 25% 30% */
+  --color-border-focus: #6B8AFF;   /* accent ring  */
+
+  /* Accent — blue-violet, slightly lighter for mid-tone legibility */
+  --color-accent:       #6B8AFF;
+  --color-accent-light: #93AAFF;
+  --color-accent-bg:    #2A3358;   /* muted tinted surface */
+
+  /* Semantic */
+  --color-success:      #34D399;   /* softer emerald */
+  --color-success-bg:   #1A3329;
+  --color-warning:      #FBBF24;
+  --color-warning-bg:   #302210;
+  --color-danger:       #F87171;   /* softer red on mid bg */
+  --color-danger-bg:    #351515;
   --color-danger-light: #FCA5A5;
-  --color-text-primary: #F0F4FF;
-  --color-text-sub: #8896B3;
-  --color-text-muted: #4A5678;
+
+  /* Text — stepped down from pure white for less contrast fatigue */
+  --color-text-primary: #E2E8F8;   /* main text    */
+  --color-text-sub:     #8FA3C8;   /* secondary    */
+  --color-text-muted:   #5A6A8A;   /* placeholders */
 }
 
 * { box-sizing: border-box; }
@@ -26,8 +40,8 @@
 html, body, #root {
   height: 100%;
   margin: 0;
-  background-color: #0A0F1E;
-  color: #F0F4FF;
+  background-color: #1E2330;
+  color: #E2E8F8;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
