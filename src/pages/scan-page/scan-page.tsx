@@ -1,8 +1,7 @@
 import { useRef, useState, useEffect, useCallback, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ScanLine, Camera, Upload, WifiOff, RefreshCw, Zap, ZapOff } from 'lucide-react'
+import { ScanLine, Camera, Upload, Zap, ZapOff } from 'lucide-react'
 import { scanImage } from '@/api/scan'
-import { enqueue, getQueueCount, flushQueue } from '@/hooks/useOfflineQueue'
 import { useToast } from '@/store/toast'
 import { cn } from '@/lib/cn'
 
@@ -12,14 +11,9 @@ const styles = {
   root: 'h-full flex flex-col bg-bg',
   header: 'px-4 pt-12 pb-4 flex items-center justify-between md:pt-8',
   headerIcon: 'w-10 h-10 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center',
-  queueBanner: 'mx-4 mb-3 flex items-center gap-3 bg-warning-bg border border-warning/30 rounded-xl px-4 py-3',
   viewfinder: 'mx-4 relative rounded-2xl overflow-hidden bg-surface border border-border max-h-100',
   actions: 'px-4 py-5 flex flex-col gap-3 md:flex-row md:flex-wrap',
 } as const
-
-function isNetworkError(err: unknown): boolean {
-  return !(err as { response?: unknown })?.response
-}
 
 function compressBlob(source: Blob): Promise<Blob> {
   return new Promise(resolve => {
@@ -50,24 +44,11 @@ export function ScanPage() {
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraSupported, setCameraSupported] = useState(true)
   const [scanning, setScanning] = useState(false)
-  const [queueCount, setQueueCount] = useState(0)
+  // Frozen still frame shown while analysis runs
+  const [frozenFrame, setFrozenFrame] = useState<string | null>(null)
 
   const navigate = useNavigate()
   const toast = useToast()
-
-  const refreshQueue = useCallback((): void => {
-    getQueueCount().then(setQueueCount)
-  }, [])
-
-  useEffect(() => { refreshQueue() }, [refreshQueue])
-
-  useEffect(() => {
-    const handleVisibility = (): void => {
-      if (document.visibilityState === 'visible') refreshQueue()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [refreshQueue])
 
   const stopCamera = useCallback((): void => {
     streamRef.current?.getTracks().forEach(t => t.stop())
@@ -77,6 +58,7 @@ export function ScanPage() {
   }, [])
 
   const startCamera = useCallback(async (): Promise<void> => {
+    setFrozenFrame(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 } },
@@ -103,32 +85,42 @@ export function ScanPage() {
     try {
       const compressed = await compressBlob(blob)
       const result = await scanImage(compressed)
-      stopCamera()
       navigate('/confirm', { state: { scanResult: result } })
     } catch (err: unknown) {
-      if (isNetworkError(err)) {
-        const compressed = await compressBlob(blob)
-        await enqueue(compressed)
-        refreshQueue()
-        toast('Saved offline — will sync when connected', 'warning')
+      const axiosErr = err as { response?: { data?: { message?: string } } }
+      if (!axiosErr.response) {
+        toast('No internet connection — please connect and try again', 'error')
       } else {
-        const axiosErr = err as { response?: { data?: { message?: string } } }
         toast(axiosErr.response?.data?.message ?? 'Scan failed', 'error')
       }
-    } finally {
+      // On error restore camera so user can retry
+      setFrozenFrame(null)
       setScanning(false)
+      await startCamera()
+      return
     }
-  }, [navigate, stopCamera, refreshQueue, toast])
+    setScanning(false)
+  }, [navigate, toast, startCamera])
 
   const captureFrame = useCallback((): void => {
     const video = videoRef.current
     if (!video) return
+
+    // 1. Grab still frame into a canvas
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     canvas.getContext('2d')!.drawImage(video, 0, 0)
+
+    // 2. Show frozen frame immediately so user can put phone down
+    setFrozenFrame(canvas.toDataURL('image/jpeg', 0.85))
+
+    // 3. Stop the live stream right away
+    stopCamera()
+
+    // 4. Kick off analysis in the background
     canvas.toBlob(blob => blob && processBlob(blob), 'image/jpeg', 0.95)
-  }, [processBlob])
+  }, [processBlob, stopCamera])
 
   const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0]
@@ -136,56 +128,39 @@ export function ScanPage() {
     e.target.value = ''
   }, [processBlob])
 
-  const handleRetryQueue = async (): Promise<void> => {
-    toast('Retrying queued scans…', 'warning')
-    await flushQueue(
-      () => { refreshQueue() },
-      () => { toast('Still offline — will retry automatically', 'error') },
-    )
-    refreshQueue()
-  }
-
   return (
     <div className={styles.root}>
       <header className={styles.header}>
         <div>
           <h1 className="text-xl font-bold text-text-primary">Scan Product</h1>
-          <p className="text-text-sub text-sm mt-0.5">Point camera at product or barcode</p>
+          <p className="text-text-sub text-sm mt-0.5">Point camera at product</p>
         </div>
         <div className={styles.headerIcon} aria-hidden="true">
           <ScanLine size={20} className="text-accent" />
         </div>
       </header>
 
-      {queueCount > 0 && (
-        <div className={styles.queueBanner} role="status" aria-live="polite">
-          <WifiOff size={18} className="text-warning shrink-0" aria-hidden="true" />
-          <div className="flex-1 min-w-0">
-            <p className="text-warning text-sm font-medium">
-              {queueCount} scan{queueCount > 1 ? 's' : ''} waiting to sync
-            </p>
-          </div>
-          <button
-            onClick={handleRetryQueue}
-            aria-label="Retry syncing queued scans"
-            className="flex items-center gap-1.5 text-xs font-semibold text-warning border border-warning/40 rounded-lg px-3 py-1.5 hover:bg-warning/10"
-          >
-            <RefreshCw size={14} aria-hidden="true" />
-            Retry
-          </button>
-        </div>
-      )}
-
       <div className={styles.viewfinder}>
+        {/* Live video feed */}
         <video
           ref={videoRef}
           playsInline
           muted
           aria-label="Camera viewfinder"
-          className={cn('w-full h-full object-cover', !cameraActive && 'hidden')}
+          className={cn('w-full h-full object-cover', (!cameraActive || frozenFrame) && 'hidden')}
         />
 
-        {!cameraActive && (
+        {/* Frozen frame shown after capture while analysis runs */}
+        {frozenFrame && (
+          <img
+            src={frozenFrame}
+            alt="Captured frame being analysed"
+            className="w-full h-full object-cover"
+          />
+        )}
+
+        {/* Idle placeholder */}
+        {!cameraActive && !frozenFrame && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
             <div className="w-20 h-20 rounded-2xl bg-accent-bg border border-accent/20 flex items-center justify-center">
               <Camera size={36} className="text-accent" aria-hidden="true" />
@@ -198,7 +173,8 @@ export function ScanPage() {
           </div>
         )}
 
-        {cameraActive && (
+        {/* Corner brackets when live */}
+        {cameraActive && !frozenFrame && (
           <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
             {[
               ['top-4 left-4', 'border-t-2 border-l-2'],
@@ -211,8 +187,9 @@ export function ScanPage() {
           </div>
         )}
 
+        {/* Analysis overlay on the frozen frame */}
         {scanning && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div
                 className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin"
@@ -220,6 +197,7 @@ export function ScanPage() {
                 aria-label="Analyzing image"
               />
               <p className="text-white text-sm font-medium">Analyzing…</p>
+              <p className="text-white/60 text-xs">You can put your phone down</p>
             </div>
           </div>
         )}
@@ -240,7 +218,7 @@ export function ScanPage() {
           </button>
         )}
 
-        {cameraActive && (
+        {cameraActive && !scanning && (
           <button
             onClick={stopCamera}
             className="w-full md:w-auto flex items-center justify-center gap-2 border border-border text-text-sub py-3 px-5 rounded-2xl text-sm hover:border-border-focus hover:text-text-primary transition-colors"

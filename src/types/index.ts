@@ -15,6 +15,8 @@ export type Product = {
   lowStockThreshold: number
   imageUrl?: string | null
   isActive: boolean
+  updateIntervalDays: number | null
+  stockLastUpdatedAt: string | null  // ISO date string from API
 }
 
 export type MatchedProduct = {
@@ -23,6 +25,7 @@ export type MatchedProduct = {
   brand: string | null
   currentStock: number
   lowStockThreshold: number
+  stockLastUpdatedAt: string | null
   matchType: 'exact' | 'fuzzy'
   matchScore: number
 }

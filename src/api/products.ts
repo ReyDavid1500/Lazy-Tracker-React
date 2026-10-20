@@ -16,3 +16,6 @@ export const updateStock = (productId: string, quantity: number) =>
 export const createProduct = (data: {
   name: string; brand?: string; initialStock: number;
 }) => api.post<Product>('/products', data)
+
+export const updateInterval = (id: string, updateIntervalDays: number | null) =>
+  api.patch(`/products/${id}/interval`, { updateIntervalDays })

@@ -13,5 +13,6 @@ export type ProductCardProps = {
   readonly onToggle: () => void
   readonly onEditStock: () => void
   readonly onEditThreshold: () => void
+  readonly onEditInterval: () => void
   readonly onDelete: () => void
 }
