@@ -108,6 +108,12 @@ function ProductCard({
             {!zero && stale && <Clock size={14} className="text-danger shrink-0" aria-label="Stock update overdue" />}
           </div>
           {p.brand && <p className="text-text-muted text-xs truncate">{p.brand}</p>}
+           {p.stockLastUpdatedAt && (
+            <p className="text-text-muted text-xs truncate">
+              Last updated:{" "}
+              {new Date(p.stockLastUpdatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+          )}
           {zero  && <p className="text-danger text-xs mt-0.5 font-medium">No units remaining</p>}
           {stale && <p className="text-danger text-xs mt-0.5 font-medium">Stock should be updated</p>}
           <StockBar value={p.currentStock} max={barMax} threshold={p.lowStockThreshold} />
@@ -141,7 +147,7 @@ function ProductCard({
             {isManager && (
               <button type="button" onClick={onEditInterval}
                 className={cn(styles.actionBtn, 'border-border text-text-sub hover:border-border-focus hover:text-text-primary')}>
-                <Clock size={13} aria-hidden="true" /> Update interval
+                <Clock size={13} aria-hidden="true" /> Set update interval
               </button>
             )}
             {isManager && (
