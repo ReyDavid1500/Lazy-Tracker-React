@@ -6,8 +6,8 @@ import {
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import {
-  getProducts, deleteProduct, updateThreshold,
-  updateStock, createProduct, updateInterval,
+  getProducts, getAlertProducts, getOutOfStockProducts, getAlertCounts,
+  deleteProduct, updateThreshold, updateStock, createProduct, updateInterval,
 } from '@/api/products'
 import { Modal } from '@/components/modal'
 import { useAuth } from '@/store/auth'
@@ -18,6 +18,8 @@ import type { Product } from '@/types'
 import type { StockBarProps, ProductCardProps } from './products-page.type'
 
 const PAGE_LIMIT = 10
+
+type Tab = 'all' | 'alerts' | 'out-of-stock'
 
 const styles = {
   root: 'min-h-full flex flex-col bg-bg',
@@ -40,22 +42,10 @@ function isStale(p: Product): boolean {
   return Date.now() - new Date(p.stockLastUpdatedAt).getTime() > p.updateIntervalDays * 86_400_000
 }
 
-function isZero(p: Product): boolean {
-  return p.currentStock === 0
-}
-
-function alertPriority(p: Product): number {
-  if (isZero(p)) return 3
-  if (isStale(p)) return 2
-  if (p.lowStockThreshold > 0 && p.currentStock <= p.lowStockThreshold) return 1
-  return 0
-}
-
 function StockBar({ value, max, threshold }: StockBarProps) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   const isDanger = value === 0
   const isWarning = !isDanger && threshold > 0 && value <= threshold
-
   return (
     <div className="mt-2 h-1.5 w-full rounded-full bg-surface-high overflow-hidden">
       <div
@@ -77,7 +67,7 @@ function ProductCard({
   product: p, expanded, isManager,
   onToggle, onEditStock, onEditThreshold, onEditInterval, onDelete,
 }: ProductCardProps) {
-  const zero  = isZero(p)
+  const zero  = p.currentStock === 0
   const stale = !zero && isStale(p)
   const low   = !zero && !stale && p.lowStockThreshold > 0 && p.currentStock <= p.lowStockThreshold
   const barMax = p.lowStockThreshold > 0
@@ -88,7 +78,6 @@ function ProductCard({
     <article className={cn(styles.card, zero && 'border-danger/50', stale && 'border-danger/40')}>
       <button type="button" className={styles.cardHeader} onClick={onToggle}
         aria-expanded={expanded} aria-controls={`product-${p.productId}-details`}>
-
         <div className={cn(
           'w-9 h-9 rounded-xl border flex items-center justify-center shrink-0',
           zero || stale ? 'bg-danger-bg border-danger/30' :
@@ -99,7 +88,6 @@ function ProductCard({
             className={cn(zero || stale ? 'text-danger' : low ? 'text-warning' : 'text-accent')}
             aria-hidden="true" />
         </div>
-
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-text-primary text-sm font-semibold">{p.name}</p>
@@ -108,7 +96,7 @@ function ProductCard({
             {!zero && stale && <Clock size={14} className="text-danger shrink-0" aria-label="Stock update overdue" />}
           </div>
           {p.brand && <p className="text-text-muted text-xs truncate">{p.brand}</p>}
-           {p.stockLastUpdatedAt && (
+          {p.stockLastUpdatedAt && (
             <p className="text-text-muted text-xs truncate">
               Last updated:{" "}
               {new Date(p.stockLastUpdatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -118,7 +106,6 @@ function ProductCard({
           {stale && <p className="text-danger text-xs mt-0.5 font-medium">Stock should be updated</p>}
           <StockBar value={p.currentStock} max={barMax} threshold={p.lowStockThreshold} />
         </div>
-
         <div className="flex flex-col items-end shrink-0 gap-0.5">
           <span className={cn('text-lg font-bold',
             zero || stale ? 'text-danger' : low ? 'text-warning' : 'text-text-primary')}>
@@ -130,7 +117,6 @@ function ProductCard({
             : <ChevronDown size={16} className="text-text-muted mt-1" aria-hidden="true" />}
         </div>
       </button>
-
       {expanded && (
         <div id={`product-${p.productId}-details`} className={styles.expandedBody}>
           <div className={styles.actionRow}>
@@ -164,20 +150,175 @@ function ProductCard({
   )
 }
 
+// ── Tab bar ─────────────────────────────────────────────────────────────────
+
+function TabBar({
+  activeTab, onTabChange,
+  alertCount, outOfStockCount,
+}: {
+  activeTab: Tab
+  onTabChange: (t: Tab) => void
+  alertCount: number | undefined
+  outOfStockCount: number | undefined
+}) {
+  const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: 'all',          label: 'All' },
+    { id: 'alerts',       label: 'Alerts',       count: alertCount },
+    { id: 'out-of-stock', label: 'Out of Stock',  count: outOfStockCount },
+  ]
+
+  return (
+    <div className="flex gap-1 px-4 pb-3" role="tablist" aria-label="Product filter tabs">
+      {tabs.map(({ id, label, count }) => {
+        const isActive = activeTab === id
+        const hasCount = count != null && count > 0
+        return (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onTabChange(id)}
+            className={cn(
+              'relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors',
+              isActive
+                ? 'bg-accent text-white shadow-[0_0_12px_rgba(107,138,255,0.35)]'
+                : 'bg-surface border border-border text-text-sub hover:text-text-primary hover:border-border-focus',
+            )}
+          >
+            {label}
+            {hasCount && (
+              <span className={cn(
+                'text-[10px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1',
+                isActive ? 'bg-white/20 text-white' : 'bg-danger/15 text-danger',
+              )}>
+                {count! > 99 ? '99+' : count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Product list panel (shared across all 3 tabs) ─────────────────────────
+
+function ProductList({
+  tab, search, isManager,
+  expanded, onToggle,
+  onEditStock, onEditThreshold, onEditInterval, onDelete,
+  onRetry,
+}: {
+  tab: Tab
+  search: string
+  isManager: boolean
+  expanded: string | null
+  onToggle: (id: string) => void
+  onEditStock: (p: Product) => void
+  onEditThreshold: (p: Product) => void
+  onEditInterval: (p: Product) => void
+  onDelete: (p: Product) => void
+  onRetry: () => void
+}) {
+  const debouncedSearch = useDebounce(search, 400)
+  const [page, setPage] = useState(1)
+
+  // Reset to p1 when search or tab changes
+  // We rely on the parent resetting page via key prop instead
+
+  const queryFn = tab === 'all'
+    ? () => getProducts(page, PAGE_LIMIT, debouncedSearch)
+    : tab === 'alerts'
+      ? () => getAlertProducts(page, PAGE_LIMIT, debouncedSearch)
+      : () => getOutOfStockProducts(page, PAGE_LIMIT, debouncedSearch)
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: [tab, debouncedSearch, page],
+    queryFn,
+    placeholderData: (prev) => prev,
+    // Alerts and out-of-stock tabs are only mounted when selected, so always enabled
+  })
+
+  const products: Product[] = data?.data ?? []
+  const total      = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT))
+
+  const emptyLabel =
+    tab === 'alerts'       ? (search ? 'No alert products match your search' : 'No alerts — everything looks good!') :
+    tab === 'out-of-stock' ? (search ? 'No out-of-stock products match your search' : 'No out-of-stock products!') :
+                             (search ? 'No products match your search' : 'No products yet')
+
+  return (
+    <>
+      <section className={styles.list} aria-label="Product list" role="tabpanel">
+        {isLoading && (
+          <div className="col-span-full flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin"
+              role="status" aria-label="Loading products" />
+          </div>
+        )}
+        {!isLoading && isError && (
+          <div className={styles.emptyState}>
+            <p className="text-danger text-sm font-medium">Failed to load products</p>
+            <button type="button" onClick={onRetry} className="text-accent text-sm">Retry</button>
+          </div>
+        )}
+        {!isLoading && !isError && products.length === 0 && (
+          <div className={styles.emptyState}>
+            <Package size={40} className="text-text-muted" aria-hidden="true" />
+            <p className="text-text-sub text-sm">{emptyLabel}</p>
+          </div>
+        )}
+        {!isLoading && !isError && products.map(p => (
+          <ProductCard
+            key={p.productId} product={p}
+            expanded={expanded === p.productId} isManager={isManager}
+            onToggle={() => onToggle(p.productId)}
+            onEditStock={() => onEditStock(p)}
+            onEditThreshold={() => onEditThreshold(p)}
+            onEditInterval={() => onEditInterval(p)}
+            onDelete={() => onDelete(p)}
+          />
+        ))}
+      </section>
+
+      {!isLoading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 px-4 py-4 pb-28 md:pb-8">
+          <button type="button"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-sub disabled:opacity-30 hover:border-border-focus hover:text-text-primary transition-colors">
+            <ChevronLeft size={16} aria-hidden="true" />
+          </button>
+          <span className="text-text-sub text-sm tabular-nums">
+            <span className="text-text-primary font-semibold">{page}</span>
+            {' / '}
+            {totalPages}
+          </span>
+          <button type="button"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-sub disabled:opacity-30 hover:border-border-focus hover:text-text-primary transition-colors">
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+
 export function ProductsPage() {
   const { user } = useAuth()
   const toast = useToast()
   const qc = useQueryClient()
   const isManager = user?.role === 'manager'
 
+  const [activeTab, setActiveTab] = useState<Tab>('all')
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const debouncedSearch = useDebounce(search, 400)
-
-  // Reset to page 1 when search changes
-  const handleSearch = (val: string) => { setSearch(val); setPage(1) }
-
   const [expanded, setExpanded] = useState<string | null>(null)
+
   const [stockModal, setStockModal] = useState<Product | null>(null)
   const [thresholdModal, setThresholdModal] = useState<Product | null>(null)
   const [intervalModal, setIntervalModal] = useState<Product | null>(null)
@@ -189,20 +330,25 @@ export function ProductsPage() {
   const [intervalInput, setIntervalInput] = useState('')
   const [newProduct, setNewProduct] = useState({ name: '', brand: '', initialStock: '0' })
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['products', debouncedSearch, page],
-    queryFn: () => getProducts(page, PAGE_LIMIT, debouncedSearch),
-    placeholderData: (prev) => prev,  // keep previous page visible while next loads
+  // Badge counts — fetched once on mount, refetched after mutations
+  const { data: counts } = useQuery({
+    queryKey: ['product-counts'],
+    queryFn: getAlertCounts,
+    staleTime: 60_000,
   })
 
-  const products: Product[] = (data?.data ?? [])
-    .slice()
-    .sort((a, b) => alertPriority(b) - alertPriority(a))
+  const handleTabChange = (t: Tab) => {
+    setActiveTab(t)
+    setSearch('')
+    setExpanded(null)
+  }
 
-  const total      = data?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT))
-
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['products'] })
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['all'] })
+    qc.invalidateQueries({ queryKey: ['alerts'] })
+    qc.invalidateQueries({ queryKey: ['out-of-stock'] })
+    qc.invalidateQueries({ queryKey: ['product-counts'] })
+  }
 
   const stockMut = useMutation({
     mutationFn: ({ id, qty }: { id: string; qty: number }) => updateStock(id, qty),
@@ -256,7 +402,7 @@ export function ProductsPage() {
     },
   })
 
-  const openStockModal    = (p: Product) => { setStockInput(String(p.currentStock)); setStockModal(p) }
+  const openStockModal     = (p: Product) => { setStockInput(String(p.currentStock));  setStockModal(p) }
   const openThresholdModal = (p: Product) => { setThresholdInput(String(p.lowStockThreshold)); setThresholdModal(p) }
   const openIntervalModal  = (p: Product) => { setIntervalInput(p.updateIntervalDays != null ? String(p.updateIntervalDays) : ''); setIntervalModal(p) }
 
@@ -288,9 +434,6 @@ export function ProductsPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-xl font-bold text-text-primary">Inventory</h1>
-            <p className="text-text-sub text-sm mt-0.5">
-              {isLoading ? 'Loading…' : `${total} product${total !== 1 ? 's' : ''}`}
-            </p>
           </div>
           {isManager && (
             <button type="button" onClick={() => setAddModal(true)} aria-label="Add new product"
@@ -301,82 +444,38 @@ export function ProductsPage() {
           )}
         </div>
 
+        {/* Search */}
         <div className={styles.searchBar}>
           <Search size={18} className="text-text-muted shrink-0" aria-hidden="true" />
           <input type="search" value={search}
-            onChange={e => handleSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Search products…" aria-label="Search products"
             className={styles.searchInput} />
         </div>
       </header>
 
-      {/* List */}
-      <section className={styles.list} aria-label="Product list">
-        {isLoading && (
-          <div className="col-span-full flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin"
-              role="status" aria-label="Loading products" />
-          </div>
-        )}
+      {/* Tabs */}
+      <TabBar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        alertCount={counts?.alerts}
+        outOfStockCount={counts?.outOfStock}
+      />
 
-        {!isLoading && isError && (
-          <div className={styles.emptyState}>
-            <p className="text-danger text-sm font-medium">Failed to load products</p>
-            <button type="button" onClick={invalidate} className="text-accent text-sm">Retry</button>
-          </div>
-        )}
-
-        {!isLoading && !isError && products.length === 0 && (
-          <div className={styles.emptyState}>
-            <Package size={40} className="text-text-muted" aria-hidden="true" />
-            <p className="text-text-sub text-sm">
-              {search ? 'No products match your search' : 'No products yet'}
-            </p>
-            {!search && isManager && (
-              <button type="button" onClick={() => setAddModal(true)} className="text-accent text-sm font-medium">
-                Add your first product
-              </button>
-            )}
-          </div>
-        )}
-
-        {!isLoading && !isError && products.map(p => (
-          <ProductCard
-            key={p.productId} product={p}
-            expanded={expanded === p.productId} isManager={isManager}
-            onToggle={() => setExpanded(prev => prev === p.productId ? null : p.productId)}
-            onEditStock={() => openStockModal(p)}
-            onEditThreshold={() => openThresholdModal(p)}
-            onEditInterval={() => openIntervalModal(p)}
-            onDelete={() => setDeleteModal(p)}
-          />
-        ))}
-      </section>
-
-      {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 px-4 py-4 pb-28 md:pb-8">
-          <button type="button"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-sub disabled:opacity-30 hover:border-border-focus hover:text-text-primary transition-colors">
-            <ChevronLeft size={16} aria-hidden="true" />
-          </button>
-
-          <span className="text-text-sub text-sm tabular-nums">
-            <span className="text-text-primary font-semibold">{page}</span>
-            {' / '}
-            {totalPages}
-          </span>
-
-          <button type="button"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-text-sub disabled:opacity-30 hover:border-border-focus hover:text-text-primary transition-colors">
-            <ChevronRight size={16} aria-hidden="true" />
-          </button>
-        </div>
-      )}
+      {/* Product list — remounted on tab change to reset page state */}
+      <ProductList
+        key={activeTab}
+        tab={activeTab}
+        search={search}
+        isManager={isManager}
+        expanded={expanded}
+        onToggle={id => setExpanded(prev => prev === id ? null : id)}
+        onEditStock={openStockModal}
+        onEditThreshold={openThresholdModal}
+        onEditInterval={openIntervalModal}
+        onDelete={p => setDeleteModal(p)}
+        onRetry={invalidate}
+      />
 
       {/* Stock modal */}
       <Modal open={stockModal !== null} onClose={() => { setStockModal(null); setStockInput('') }}
